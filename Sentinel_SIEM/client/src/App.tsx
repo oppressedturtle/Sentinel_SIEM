@@ -6,6 +6,7 @@ import { AlertsPage } from "./pages/AlertsPage";
 import { CasesPage } from "./pages/CasesPage";
 import { DashboardBuilderPage } from "./pages/DashboardBuilderPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { EndpointsPage } from "./pages/EndpointsPage";
 import { IngestionPage } from "./pages/IngestionPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RulesPage } from "./pages/RulesPage";
@@ -28,6 +29,7 @@ export function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/ingest" element={hasPermission("events:write") ? <IngestionPage /> : <Navigate to="/" replace />} />
+        <Route path="/endpoints" element={hasPermission("agents:read") ? <EndpointsPage /> : <Navigate to="/" replace />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/rules" element={<RulesPage />} />
         <Route path="/alerts" element={<AlertsPage />} />

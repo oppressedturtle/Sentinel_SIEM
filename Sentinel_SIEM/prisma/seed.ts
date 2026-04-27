@@ -6,6 +6,8 @@ const prisma = new PrismaClient();
 
 const SESSION_SECRET = process.env.SESSION_SECRET ?? "dev-seed-secret";
 const DEV_API_KEY = "sfk_dev_sample_ingest_key_change_me";
+const DEV_AGENT_ENROLLMENT_TOKEN = "enr_dev_sample_agent_enrollment_change_me";
+const DEV_AGENT_API_KEY = "ag_dev_sample_agent_key_change_me";
 
 function hashSecret(value: string) {
   return crypto.createHash("sha256").update(`${SESSION_SECRET}:${value}`).digest("hex");
@@ -32,6 +34,9 @@ async function main() {
   await prisma.ingestionError.deleteMany();
   await prisma.ingestionBatch.deleteMany();
   await prisma.event.deleteMany();
+  await prisma.agentHeartbeat.deleteMany();
+  await prisma.agent.deleteMany();
+  await prisma.agentEnrollmentToken.deleteMany();
   await prisma.parserMapping.deleteMany();
   await prisma.dataSource.deleteMany();
   await prisma.notificationChannel.deleteMany();
@@ -59,6 +64,8 @@ async function main() {
     ["rules:manage", "Create, test, import, export, and run rules"],
     ["dashboards:read", "View dashboards"],
     ["dashboards:manage", "Create, edit, clone, import, and export dashboards"],
+    ["agents:read", "View enrolled endpoint agents and their telemetry"],
+    ["agents:manage", "Manage enrollment tokens, endpoint agent policy, and agent API keys"],
     ["reports:export", "Export case reports"],
     ["settings:manage", "Manage customization settings"],
     ["admin:manage", "Manage users, API keys, data sources, audit logs, and health"]
@@ -74,7 +81,7 @@ async function main() {
     .filter((permission) => permission.key.endsWith(":read") || permission.key === "reports:export")
     .map((permission) => permission.id);
   const analystPermissionIds = permissions
-    .filter((permission) => permission.key !== "admin:manage" && permission.key !== "settings:manage")
+    .filter((permission) => !["admin:manage", "settings:manage", "agents:manage"].includes(permission.key))
     .map((permission) => permission.id);
 
   const adminRole = await prisma.role.create({
@@ -184,6 +191,82 @@ async function main() {
       status: "healthy",
       lastSeenAt: minutesAgo(2),
       metadata: { zone: "edge", collector: "syslog-01" }
+    }
+  });
+
+  const defaultAgentPolicy = {
+    intervals: {
+      heartbeatSeconds: 60,
+      windowsEventSeconds: 60,
+      processSeconds: 120,
+      networkSeconds: 120,
+      fimSeconds: 300
+    },
+    windowsEventLogs: ["Security", "System", "Application"],
+    collectProcesses: true,
+    collectNetwork: true,
+    collectSystemInfo: true,
+    fimPaths: ["C:\\Users\\Public\\Documents"]
+  };
+
+  const agentEnrollmentToken = await prisma.agentEnrollmentToken.create({
+    data: {
+      name: "Default Windows endpoint enrollment",
+      tokenPrefix: "enr_dev",
+      tokenHash: hashSecret(DEV_AGENT_ENROLLMENT_TOKEN),
+      tags: ["windows", "workstation"],
+      policy: defaultAgentPolicy,
+      usesRemaining: 25,
+      createdById: admin.id
+    }
+  });
+
+  const agentSource = await prisma.dataSource.create({
+    data: {
+      name: "Agent win-finance-12 ag_dev",
+      type: "endpoint_agent",
+      parserType: "agent",
+      status: "healthy",
+      lastSeenAt: minutesAgo(1),
+      metadata: { hostname: "win-finance-12", version: "0.1.0", osName: "Windows" }
+    }
+  });
+
+  const demoAgent = await prisma.agent.create({
+    data: {
+      hostname: "win-finance-12",
+      osName: "Windows",
+      osVersion: "Windows 11 Pro 23H2",
+      architecture: "amd64",
+      username: "aparker",
+      ipAddress: "10.24.8.41",
+      version: "0.1.0",
+      status: "enabled",
+      tags: ["windows", "finance", "workstation"],
+      groupName: "finance-workstations",
+      apiKeyPrefix: "ag_dev",
+      apiKeyHash: hashSecret(DEV_AGENT_API_KEY),
+      policy: defaultAgentPolicy,
+      health: {
+        status: "healthy",
+        systemInfo: { uptimeSeconds: 84200, collectionMode: "visible" },
+        metrics: { queuedEvents: 0 }
+      },
+      lastSeenAt: minutesAgo(1),
+      lastHeartbeatAt: minutesAgo(1),
+      enrollmentTokenId: agentEnrollmentToken.id,
+      dataSourceId: agentSource.id
+    }
+  });
+
+  await prisma.agentHeartbeat.create({
+    data: {
+      agentId: demoAgent.id,
+      status: "healthy",
+      ipAddress: "10.24.8.41",
+      systemInfo: { hostname: "win-finance-12", os: "Windows 11 Pro 23H2", uptimeSeconds: 84200 },
+      metrics: { processCount: 137, networkConnections: 28, fimPaths: 1 },
+      errors: []
     }
   });
 
@@ -344,6 +427,71 @@ async function main() {
       severity: "high",
       message: "Blocked outbound connection to sanctioned destination list",
       dataSourceId: firewallSource.id
+    },
+    {
+      timestamp: minutesAgo(22),
+      host: "win-finance-12",
+      userName: "aparker",
+      sourceIp: "10.24.8.41",
+      destinationIp: null,
+      eventType: "windows_security_4625",
+      category: "authentication",
+      severity: "medium",
+      message: "Windows Security 4625 failed login observed by endpoint agent",
+      dataSourceId: agentSource.id,
+      agentId: demoAgent.id
+    },
+    {
+      timestamp: minutesAgo(20),
+      host: "win-finance-12",
+      userName: "SYSTEM",
+      sourceIp: "10.24.8.41",
+      destinationIp: null,
+      eventType: "windows_system_7045",
+      category: "service",
+      severity: "high",
+      message: "Windows System 7045 service installation observed: ExampleUpdater",
+      dataSourceId: agentSource.id,
+      agentId: demoAgent.id
+    },
+    {
+      timestamp: minutesAgo(18),
+      host: "win-finance-12",
+      userName: "aparker",
+      sourceIp: "10.24.8.41",
+      destinationIp: null,
+      eventType: "process_start",
+      category: "process",
+      severity: "medium",
+      message: "Process started from Downloads folder: C:\\Users\\aparker\\Downloads\\invoice-viewer.exe",
+      dataSourceId: agentSource.id,
+      agentId: demoAgent.id
+    },
+    {
+      timestamp: minutesAgo(17),
+      host: "win-finance-12",
+      userName: "aparker",
+      sourceIp: "10.24.8.41",
+      destinationIp: "203.0.113.199",
+      eventType: "network_connection",
+      category: "network",
+      severity: "medium",
+      message: "External outbound connection from invoice-viewer.exe to 203.0.113.199:443",
+      dataSourceId: agentSource.id,
+      agentId: demoAgent.id
+    },
+    {
+      timestamp: minutesAgo(15),
+      host: "win-finance-12",
+      userName: "aparker",
+      sourceIp: "10.24.8.41",
+      destinationIp: null,
+      eventType: "file_modified",
+      category: "file_integrity",
+      severity: "medium",
+      message: "File integrity change in monitored folder C:\\Users\\Public\\Documents\\quarterly-plan.xlsx",
+      dataSourceId: agentSource.id,
+      agentId: demoAgent.id
     }
   ];
 
@@ -354,14 +502,15 @@ async function main() {
         data: {
           ...event,
           raw: { ...event, timestamp: event.timestamp.toISOString() },
-          normalized: {
+          normalized: JSON.parse(JSON.stringify({
             "@timestamp": event.timestamp.toISOString(),
             host: { name: event.host },
             user: { name: event.userName },
             source: { ip: event.sourceIp },
             destination: { ip: event.destinationIp },
-            event: { action: event.eventType, category: event.category, severity: event.severity }
-          },
+            event: { action: event.eventType, category: event.category, severity: event.severity },
+            agent: "agentId" in event ? { id: event.agentId, hostname: event.host } : undefined
+          })),
           searchText: [
             event.host,
             event.userName,
@@ -390,6 +539,19 @@ async function main() {
       rejectedCount: 0,
       completedAt: new Date(),
       dataSourceId: endpointSource.id
+    }
+  });
+
+  await prisma.ingestionBatch.create({
+    data: {
+      sourceName: "Agent win-finance-12",
+      sourceType: "agent",
+      status: "completed",
+      receivedCount: 5,
+      acceptedCount: 5,
+      rejectedCount: 0,
+      completedAt: new Date(),
+      dataSourceId: agentSource.id
     }
   });
 
@@ -444,6 +606,83 @@ async function main() {
       mitreTechnique: "T1078",
       tags: ["correlation", "identity", "endpoint"]
     }
+  });
+
+  await prisma.detectionRule.createMany({
+    data: [
+      {
+        name: "Agent: many failed Windows logins",
+        description: "Detects a burst of Windows Security 4625 failures reported by endpoint agents.",
+        type: "threshold",
+        severity: "high",
+        riskScore: 76,
+        schedule: "every 5 minutes",
+        definition: { filters: { sourceType: "endpoint_agent", eventType: "windows_security_4625" }, threshold: 5, lookbackMinutes: 30 },
+        mitreTactic: "Credential Access",
+        mitreTechnique: "T1110",
+        tags: ["agent", "windows", "authentication"]
+      },
+      {
+        name: "Agent: new local admin user",
+        description: "Flags Windows local group membership changes involving Administrators.",
+        type: "keyword",
+        severity: "high",
+        riskScore: 80,
+        schedule: "every 10 minutes",
+        definition: { keyword: "administrators", filters: { sourceType: "endpoint_agent", eventType: "windows_security_4732" }, lookbackMinutes: 60 },
+        mitreTactic: "Persistence",
+        mitreTechnique: "T1098",
+        tags: ["agent", "windows", "account-management"]
+      },
+      {
+        name: "Agent: suspicious service installation",
+        description: "Detects Windows System 7045 service installation events from endpoint agents.",
+        type: "keyword",
+        severity: "high",
+        riskScore: 78,
+        schedule: "every 10 minutes",
+        definition: { keyword: "service", filters: { sourceType: "endpoint_agent", eventType: "windows_system_7045" }, lookbackMinutes: 60 },
+        mitreTactic: "Persistence",
+        mitreTechnique: "T1543.003",
+        tags: ["agent", "windows", "service"]
+      },
+      {
+        name: "Agent: unusual outbound connection",
+        description: "Looks for endpoint-agent network events with external outbound connection wording.",
+        type: "keyword",
+        severity: "medium",
+        riskScore: 61,
+        schedule: "every 15 minutes",
+        definition: { keyword: "external outbound", filters: { sourceType: "endpoint_agent", category: "network" }, lookbackMinutes: 60 },
+        mitreTactic: "Command and Control",
+        mitreTechnique: "T1071",
+        tags: ["agent", "network"]
+      },
+      {
+        name: "Agent: process from temp or downloads",
+        description: "Flags process starts from user temp or downloads folders.",
+        type: "keyword",
+        severity: "medium",
+        riskScore: 65,
+        schedule: "every 10 minutes",
+        definition: { keyword: "downloads", filters: { sourceType: "endpoint_agent", eventType: "process_start" }, lookbackMinutes: 60 },
+        mitreTactic: "Execution",
+        mitreTechnique: "T1204",
+        tags: ["agent", "process"]
+      },
+      {
+        name: "Agent: security log cleared",
+        description: "Detects Windows Security 1102 audit log clear events.",
+        type: "keyword",
+        severity: "critical",
+        riskScore: 95,
+        schedule: "every 5 minutes",
+        definition: { keyword: "security", filters: { sourceType: "endpoint_agent", eventType: "windows_security_1102" }, lookbackMinutes: 60 },
+        mitreTactic: "Defense Evasion",
+        mitreTechnique: "T1070.001",
+        tags: ["agent", "windows", "audit"]
+      }
+    ]
   });
 
   await prisma.ruleExecution.createMany({
@@ -673,6 +912,8 @@ async function main() {
   console.log("Login: analyst@sentinelforge.local / Password123!");
   console.log("Login: auditor@sentinelforge.local / Password123!");
   console.log(`Development API key: ${DEV_API_KEY}`);
+  console.log(`Development agent enrollment token: ${DEV_AGENT_ENROLLMENT_TOKEN}`);
+  console.log(`Development demo agent API key: ${DEV_AGENT_API_KEY}`);
 }
 
 main()

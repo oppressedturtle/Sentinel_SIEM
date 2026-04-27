@@ -1,0 +1,24 @@
+{
+  "server_url": "http://localhost:4000",
+  "enrollment_token": "PASTE_ENROLLMENT_TOKEN_HERE",
+  "api_key": "",
+  "agent_id": "",
+  "hostname": "",
+  "tags": ["windows", "workstation"],
+  "collection": {
+    "intervals": {
+      "heartbeatSeconds": 60,
+      "windowsEventSeconds": 60,
+      "processSeconds": 120,
+      "networkSeconds": 120,
+      "fimSeconds": 300
+    },
+    "windowsEventLogs": ["Security", "System", "Application"],
+    "collectProcesses": true,
+    "collectNetwork": true,
+    "collectSystemInfo": true,
+    "fimPaths": ["C:\\Users\\Public\\Documents"],
+    "maxWindowsEventsPerLog": 50,
+    "maxFimFiles": 500
+  }
+}

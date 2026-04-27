@@ -26,6 +26,18 @@ export type EventFilters = {
   eventType?: string;
   severity?: string;
   category?: string;
+  agentId?: string;
+  sourceType?: string;
+};
+
+export type AgentAuthContext = {
+  id: string;
+  hostname: string;
+  status: string;
+  apiKeyPrefix: string;
+  dataSourceId?: string | null;
+  policy: Record<string, unknown>;
+  tags: string[];
 };
 
 export type NormalizedEventInput = {
@@ -42,4 +54,3 @@ export type NormalizedEventInput = {
   normalized: Record<string, unknown>;
   searchText: string;
 };
-

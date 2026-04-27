@@ -20,6 +20,8 @@ export function buildEventWhere(filters: EventFilters): Prisma.EventWhereInput {
   if (filters.eventType) where.eventType = { contains: filters.eventType, mode: "insensitive" };
   if (filters.severity) where.severity = filters.severity;
   if (filters.category) where.category = { contains: filters.category, mode: "insensitive" };
+  if (filters.agentId) where.agentId = filters.agentId;
+  if (filters.sourceType) where.dataSource = { type: filters.sourceType };
 
   if (filters.q) {
     where.searchText = { contains: filters.q.toLowerCase(), mode: "insensitive" };
@@ -39,7 +41,7 @@ export async function searchEvents(filters: EventFilters, page = 1, pageSize = 5
       orderBy: { timestamp: "desc" },
       skip,
       take,
-      include: { dataSource: true }
+      include: { dataSource: true, agent: true }
     }),
     prisma.event.count({ where })
   ]);

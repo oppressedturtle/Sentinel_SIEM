@@ -29,6 +29,7 @@ const defaultForm = {
   severity: "medium",
   riskScore: 50,
   schedule: "manual",
+  target: "all",
   keyword: "powershell",
   threshold: 5,
   field: "eventType",
@@ -51,20 +52,26 @@ export function RulesPage() {
   const [message, setMessage] = useState("");
 
   const definition = useMemo(() => {
+    const targetFilters = form.target === "agent" ? { sourceType: "endpoint_agent" } : {};
     if (form.type === "threshold") {
-      return { filters: { category: form.value || undefined }, threshold: Number(form.threshold), lookbackMinutes: Number(form.lookbackMinutes) };
+      return {
+        filters: { ...targetFilters, category: form.value || undefined },
+        threshold: Number(form.threshold),
+        lookbackMinutes: Number(form.lookbackMinutes)
+      };
     }
     if (form.type === "field_comparison") {
-      return { field: form.field, operator: form.operator, value: form.value, lookbackMinutes: Number(form.lookbackMinutes) };
+      return { filters: targetFilters, field: form.field, operator: form.operator, value: form.value, lookbackMinutes: Number(form.lookbackMinutes) };
     }
     if (form.type === "sequence") {
       return {
+        filters: targetFilters,
         groupBy: form.groupBy,
         sequence: form.sequence.split(",").map((value) => ({ field: "eventType", value: value.trim() })).filter((item) => item.value),
         lookbackMinutes: Number(form.lookbackMinutes)
       };
     }
-    return { keyword: form.keyword, lookbackMinutes: Number(form.lookbackMinutes) };
+    return { keyword: form.keyword, filters: targetFilters, lookbackMinutes: Number(form.lookbackMinutes) };
   }, [form]);
 
   async function load() {
@@ -91,6 +98,7 @@ export function RulesPage() {
       severity: rule.severity,
       riskScore: rule.riskScore,
       schedule: rule.schedule,
+      target: (def.filters as { sourceType?: string } | undefined)?.sourceType === "endpoint_agent" ? "agent" : "all",
       keyword: String(def.keyword ?? defaultForm.keyword),
       threshold: Number(def.threshold ?? defaultForm.threshold),
       field: String(def.field ?? defaultForm.field),
@@ -180,6 +188,12 @@ export function RulesPage() {
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
                   <option value="critical">Critical</option>
+                </Select>
+              </Field>
+              <Field label="Target">
+                <Select value={form.target} onChange={(event) => update("target", event.target.value)}>
+                  <option value="all">All events</option>
+                  <option value="agent">Endpoint agents</option>
                 </Select>
               </Field>
               <Field label="Risk score"><Input type="number" value={form.riskScore} onChange={(event) => update("riskScore", Number(event.target.value))} /></Field>

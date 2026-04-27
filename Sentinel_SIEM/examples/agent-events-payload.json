@@ -1,0 +1,33 @@
+{
+  "events": [
+    {
+      "type": "windows_event",
+      "timestamp": "2026-04-27T10:00:00.000Z",
+      "channel": "Security",
+      "event_id": 4625,
+      "level": "warning",
+      "message": "Failed login observed by endpoint agent"
+    },
+    {
+      "type": "process",
+      "timestamp": "2026-04-27T10:01:00.000Z",
+      "process_name": "invoice-viewer.exe",
+      "pid": 5424,
+      "ppid": 1008,
+      "path": "C:\\Users\\aparker\\Downloads\\invoice-viewer.exe",
+      "user": "FINANCE\\aparker",
+      "message": "Process started from Downloads folder"
+    },
+    {
+      "type": "network_connection",
+      "timestamp": "2026-04-27T10:02:00.000Z",
+      "local_ip": "10.24.8.41",
+      "local_port": 51324,
+      "remote_ip": "203.0.113.199",
+      "remote_port": 443,
+      "protocol": "tcp",
+      "process_name": "invoice-viewer.exe",
+      "message": "External outbound connection from invoice-viewer.exe"
+    }
+  ]
+}

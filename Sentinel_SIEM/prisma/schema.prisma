@@ -19,6 +19,7 @@ model User {
   sessions      Session[]
   apiKeys       ApiKey[]
   auditLogs     AuditLog[]
+  agentTokens   AgentEnrollmentToken[]
   ownedAlerts   Alert[]      @relation("AlertOwner")
   caseComments  CaseComment[]
   alertComments AlertComment[]
@@ -108,6 +109,7 @@ model DataSource {
   events         Event[]
   batches        IngestionBatch[]
   parserMappings ParserMapping[]
+  agents         Agent[]
 }
 
 model ParserMapping {
@@ -164,6 +166,8 @@ model Event {
   searchText      String       @default("")
   dataSourceId    String?
   dataSource      DataSource?  @relation(fields: [dataSourceId], references: [id], onDelete: SetNull)
+  agentId         String?
+  agent           Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
   alerts          AlertEvent[]
   cases           CaseEvent[]
 
@@ -174,6 +178,70 @@ model Event {
   @@index([destinationIp])
   @@index([eventType])
   @@index([severity])
+  @@index([agentId])
+}
+
+model AgentEnrollmentToken {
+  id            String    @id @default(cuid())
+  name          String
+  tokenPrefix   String    @unique
+  tokenHash     String    @unique
+  status        String    @default("active")
+  tags          String[]
+  policy        Json      @default("{}")
+  usesRemaining Int?
+  expiresAt     DateTime?
+  createdById   String?
+  createdBy     User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+  lastUsedAt    DateTime?
+  agents        Agent[]
+}
+
+model Agent {
+  id                String                 @id @default(cuid())
+  hostname          String
+  osName            String
+  osVersion         String?
+  architecture      String?
+  username          String?
+  ipAddress         String?
+  version           String
+  status            String                 @default("enabled")
+  tags              String[]
+  groupName         String?
+  apiKeyPrefix      String                 @unique
+  apiKeyHash        String                 @unique
+  policy            Json                   @default("{}")
+  health            Json                   @default("{}")
+  lastSeenAt        DateTime?
+  lastHeartbeatAt   DateTime?
+  lastError         String?
+  eventCount        Int                    @default(0)
+  enrollmentTokenId String?
+  enrollmentToken   AgentEnrollmentToken?  @relation(fields: [enrollmentTokenId], references: [id], onDelete: SetNull)
+  dataSourceId      String?
+  dataSource        DataSource?            @relation(fields: [dataSourceId], references: [id], onDelete: SetNull)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  events            Event[]
+  heartbeats        AgentHeartbeat[]
+
+  @@index([hostname])
+  @@index([status])
+  @@index([lastSeenAt])
+}
+
+model AgentHeartbeat {
+  id         String   @id @default(cuid())
+  agentId    String
+  agent      Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  status     String
+  ipAddress  String?
+  systemInfo Json     @default("{}")
+  metrics    Json     @default("{}")
+  errors     Json     @default("[]")
+  createdAt  DateTime @default(now())
 }
 
 model SavedSearch {

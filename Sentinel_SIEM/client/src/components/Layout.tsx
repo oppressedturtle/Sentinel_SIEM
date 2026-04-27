@@ -4,6 +4,7 @@ import {
   FileStack,
   Gauge,
   LogOut,
+  Monitor,
   PanelsTopLeft,
   Search,
   Settings,
@@ -20,6 +21,7 @@ import { IconButton } from "./ui";
 const navItems = [
   { path: "/", label: "Overview", icon: Gauge, permission: "dashboards:read" },
   { path: "/ingest", label: "Ingestion", icon: UploadCloud, permission: "events:write" },
+  { path: "/endpoints", label: "Endpoints", icon: Monitor, permission: "agents:read" },
   { path: "/search", label: "Search", icon: Search, permission: "events:read" },
   { path: "/rules", label: "Rules", icon: ShieldCheck, permission: "rules:read" },
   { path: "/alerts", label: "Alerts", icon: Bell, permission: "alerts:read" },

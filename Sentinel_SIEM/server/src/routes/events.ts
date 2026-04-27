@@ -25,7 +25,9 @@ eventsRouter.get(
       destinationIp: req.query.destinationIp?.toString(),
       eventType: req.query.eventType?.toString(),
       severity: req.query.severity?.toString(),
-      category: req.query.category?.toString()
+      category: req.query.category?.toString(),
+      agentId: req.query.agentId?.toString(),
+      sourceType: req.query.sourceType?.toString()
     };
 
     const result = await searchEvents(filters, page, pageSize);
@@ -79,4 +81,3 @@ eventsRouter.post(
     return res.json({ ok: true });
   })
 );
-
