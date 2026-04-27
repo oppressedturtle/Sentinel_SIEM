@@ -1,0 +1,16 @@
+{
+  "sourceName": "API example sender",
+  "events": [
+    {
+      "timestamp": "2026-04-26T14:25:00.000Z",
+      "host": "win-ops-07",
+      "user": "sreynolds",
+      "sourceIp": "10.30.4.77",
+      "destinationIp": "198.51.100.45",
+      "eventType": "powershell_encoded_command",
+      "category": "process",
+      "severity": "high",
+      "message": "Encoded PowerShell command observed from API ingest example"
+    }
+  ]
+}

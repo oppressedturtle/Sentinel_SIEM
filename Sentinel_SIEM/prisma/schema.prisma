@@ -1,0 +1,382 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String       @id @default(cuid())
+  email         String       @unique
+  name          String
+  passwordHash  String
+  status        String       @default("active")
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  roles         UserRole[]
+  sessions      Session[]
+  apiKeys       ApiKey[]
+  auditLogs     AuditLog[]
+  ownedAlerts   Alert[]      @relation("AlertOwner")
+  caseComments  CaseComment[]
+  alertComments AlertComment[]
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  key         String           @unique
+  description String
+  roles       RolePermission[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String
+  prefix      String    @unique
+  keyHash     String    @unique
+  scopes      String[]
+  status      String    @default("active")
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  ipAddress String?
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+}
+
+model DataSource {
+  id             String           @id @default(cuid())
+  name           String           @unique
+  type           String
+  status         String           @default("healthy")
+  parserType     String           @default("json")
+  lastSeenAt     DateTime?
+  metadata       Json             @default("{}")
+  createdAt      DateTime         @default(now())
+  events         Event[]
+  batches        IngestionBatch[]
+  parserMappings ParserMapping[]
+}
+
+model ParserMapping {
+  id           String     @id @default(cuid())
+  name         String
+  sourceType   String
+  mapping      Json       @default("{}")
+  sample       Json       @default("{}")
+  enabled      Boolean    @default(true)
+  dataSourceId String?
+  dataSource   DataSource? @relation(fields: [dataSourceId], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
+}
+
+model IngestionBatch {
+  id             String           @id @default(cuid())
+  sourceName     String
+  sourceType     String
+  status         String           @default("completed")
+  receivedCount  Int              @default(0)
+  acceptedCount  Int              @default(0)
+  rejectedCount  Int              @default(0)
+  startedAt      DateTime         @default(now())
+  completedAt    DateTime?
+  dataSourceId   String?
+  dataSource     DataSource?      @relation(fields: [dataSourceId], references: [id], onDelete: SetNull)
+  errors         IngestionError[]
+}
+
+model IngestionError {
+  id        String         @id @default(cuid())
+  batchId   String
+  batch     IngestionBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  line      Int?
+  message   String
+  raw       Json           @default("{}")
+  createdAt DateTime       @default(now())
+}
+
+model Event {
+  id              String       @id @default(cuid())
+  timestamp       DateTime
+  receivedAt      DateTime     @default(now())
+  host            String?
+  userName        String?
+  sourceIp        String?
+  destinationIp   String?
+  eventType       String
+  category        String?
+  severity        String       @default("low")
+  message         String
+  raw             Json         @default("{}")
+  normalized      Json         @default("{}")
+  searchText      String       @default("")
+  dataSourceId    String?
+  dataSource      DataSource?  @relation(fields: [dataSourceId], references: [id], onDelete: SetNull)
+  alerts          AlertEvent[]
+  cases           CaseEvent[]
+
+  @@index([timestamp])
+  @@index([host])
+  @@index([userName])
+  @@index([sourceIp])
+  @@index([destinationIp])
+  @@index([eventType])
+  @@index([severity])
+}
+
+model SavedSearch {
+  id        String   @id @default(cuid())
+  name      String
+  query     Json     @default("{}")
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DetectionRule {
+  id              String          @id @default(cuid())
+  name            String
+  description     String
+  type            String
+  severity        String
+  riskScore       Int             @default(50)
+  schedule        String          @default("manual")
+  enabled         Boolean         @default(true)
+  definition      Json            @default("{}")
+  mitreTactic     String?
+  mitreTechnique  String?
+  tags            String[]
+  lastRunAt       DateTime?
+  lastDurationMs  Int?
+  lastError       String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  executions      RuleExecution[]
+  alerts          Alert[]
+}
+
+model RuleExecution {
+  id              String        @id @default(cuid())
+  ruleId          String
+  rule            DetectionRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  status          String
+  startedAt       DateTime      @default(now())
+  completedAt     DateTime?
+  durationMs      Int?
+  matchedEvents   Int           @default(0)
+  alertsCreated   Int           @default(0)
+  error           String?
+}
+
+model Alert {
+  id              String          @id @default(cuid())
+  title           String
+  status          String          @default("open")
+  severity        String
+  riskScore       Int
+  tags            String[]
+  falsePositive   Boolean         @default(false)
+  falsePositiveNote String?
+  ownerId         String?
+  owner           User?           @relation("AlertOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  ruleId          String?
+  rule            DetectionRule?  @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  events          AlertEvent[]
+  comments        AlertComment[]
+  cases           CaseAlert[]
+}
+
+model AlertEvent {
+  alertId String
+  eventId String
+  alert   Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@id([alertId, eventId])
+}
+
+model AlertComment {
+  id        String   @id @default(cuid())
+  alertId   String
+  alert     Alert    @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model Case {
+  id             String             @id @default(cuid())
+  title          String
+  description    String
+  status         String             @default("open")
+  severity       String             @default("medium")
+  affectedHosts  String[]
+  affectedUsers  String[]
+  evidence       Json               @default("[]")
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  alerts         CaseAlert[]
+  events         CaseEvent[]
+  comments       CaseComment[]
+  timeline       CaseTimelineItem[]
+}
+
+model CaseAlert {
+  caseId  String
+  alertId String
+  case    Case  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  alert   Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@id([caseId, alertId])
+}
+
+model CaseEvent {
+  caseId  String
+  eventId String
+  case    Case  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@id([caseId, eventId])
+}
+
+model CaseComment {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model CaseTimelineItem {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  kind      String
+  title     String
+  details   Json     @default("{}")
+  createdAt DateTime @default(now())
+}
+
+model Dashboard {
+  id          String            @id @default(cuid())
+  name        String
+  description String
+  layout      Json              @default("{}")
+  isDefault   Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  widgets     DashboardWidget[]
+}
+
+model DashboardWidget {
+  id          String    @id @default(cuid())
+  dashboardId String
+  dashboard   Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  type        String
+  title       String
+  query       Json      @default("{}")
+  position    Json      @default("{}")
+  options     Json      @default("{}")
+}
+
+model CustomField {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  fieldType   String
+  description String
+  appliesTo   String
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model CustomSchema {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String
+  fields      Json     @default("[]")
+  createdAt   DateTime @default(now())
+}
+
+model ThemePreference {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  mode      String   @default("dark")
+  density   String   @default("comfortable")
+  colors    Json     @default("{}")
+  createdAt DateTime @default(now())
+}
+
+model NotificationChannel {
+  id        String   @id @default(cuid())
+  name      String
+  type      String
+  config    Json     @default("{}")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model RetentionPolicy {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  target    String
+  days      Int
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+}

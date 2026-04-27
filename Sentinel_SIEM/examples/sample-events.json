@@ -1,0 +1,35 @@
+[
+  {
+    "timestamp": "2026-04-26T13:45:00.000Z",
+    "host": "win-hr-02",
+    "user": "lgarcia",
+    "sourceIp": "10.25.8.21",
+    "destinationIp": "10.25.1.10",
+    "eventType": "login_failure",
+    "category": "authentication",
+    "severity": "medium",
+    "message": "Failed login for lgarcia from HR workstation"
+  },
+  {
+    "timestamp": "2026-04-26T13:49:00.000Z",
+    "host": "win-hr-02",
+    "user": "lgarcia",
+    "sourceIp": "10.25.8.21",
+    "destinationIp": "10.25.1.10",
+    "eventType": "login_success",
+    "category": "authentication",
+    "severity": "low",
+    "message": "Successful login after repeated failures"
+  },
+  {
+    "timestamp": "2026-04-26T14:02:00.000Z",
+    "host": "win-hr-02",
+    "user": "lgarcia",
+    "sourceIp": "10.25.8.21",
+    "destinationIp": "203.0.113.10",
+    "eventType": "powershell_encoded_command",
+    "category": "process",
+    "severity": "high",
+    "message": "Encoded PowerShell spawned by office macro child process"
+  }
+]
